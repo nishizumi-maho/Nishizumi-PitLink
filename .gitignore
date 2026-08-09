@@ -1,0 +1,13 @@
+# Build output
+bin/
+obj/
+
+# User-specific files
+*.user
+*.suo
+
+# MOZA SDK binaries are proprietary and not redistributed here - see README "Getting the MOZA SDK".
+lib/x64/*.dll
+
+# Local app state (mappings are user-specific)
+*.bak
