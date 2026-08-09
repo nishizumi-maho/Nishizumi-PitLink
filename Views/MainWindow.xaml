@@ -28,17 +28,17 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Nishizumi PitLink" Foreground="White" FontSize="16" FontWeight="Bold" Margin="0,0,20,0"/>
-                    <TextBlock Text="iRacing:" Foreground="#9ca3af" Margin="0,0,4,0"/>
-                    <TextBlock Text="{Binding IRacingConnected, Converter={StaticResource ConnectedText}}" Foreground="White" Margin="0,0,20,0" FontWeight="SemiBold"/>
-                    <TextBlock Text="Current car:" Foreground="#9ca3af" Margin="0,0,4,0"/>
-                    <TextBlock Text="{Binding CurrentCarDisplay}" Foreground="White" Margin="0,0,20,0" FontWeight="SemiBold"/>
-                    <TextBlock Text="Track:" Foreground="#9ca3af" Margin="0,0,4,0"/>
-                    <TextBlock Text="{Binding CurrentTrackDisplay}" Foreground="White" Margin="0,0,20,0" FontWeight="SemiBold"/>
-                    <TextBlock Text="Preset applied:" Foreground="#9ca3af" Margin="0,0,4,0"/>
-                    <TextBlock Text="{Binding CurrentProfileDisplay}" Foreground="#4ade80" FontWeight="SemiBold"/>
-                </StackPanel>
+                <WrapPanel>
+                    <TextBlock Text="Nishizumi PitLink" Foreground="White" FontSize="16" FontWeight="Bold" Margin="0,0,20,4"/>
+                    <TextBlock Text="iRacing:" Foreground="#9ca3af" Margin="0,0,4,4"/>
+                    <TextBlock Text="{Binding IRacingConnected, Converter={StaticResource ConnectedText}}" Foreground="White" Margin="0,0,20,4" FontWeight="SemiBold"/>
+                    <TextBlock Text="Current car:" Foreground="#9ca3af" Margin="0,0,4,4"/>
+                    <TextBlock Text="{Binding CurrentCarDisplay}" Foreground="White" Margin="0,0,20,4" FontWeight="SemiBold"/>
+                    <TextBlock Text="Track:" Foreground="#9ca3af" Margin="0,0,4,4"/>
+                    <TextBlock Text="{Binding CurrentTrackDisplay}" Foreground="White" Margin="0,0,20,4" FontWeight="SemiBold"/>
+                    <TextBlock Text="Preset applied:" Foreground="#9ca3af" Margin="0,0,4,4"/>
+                    <TextBlock Text="{Binding CurrentProfileDisplay}" Foreground="#4ade80" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                </WrapPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
                     <CheckBox Content="Automatic switching active" IsChecked="{Binding GlobalEnabled}" Foreground="White" VerticalAlignment="Center"/>
                 </StackPanel>
