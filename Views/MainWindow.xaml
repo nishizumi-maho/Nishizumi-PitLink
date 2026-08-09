@@ -12,6 +12,7 @@
 
     <Window.Resources>
         <views:BoolToConnectedTextConverter x:Key="ConnectedText"/>
+        <views:UtcToLocalTimeConverter x:Key="UtcToLocal"/>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
         <ObjectDataProvider x:Key="MatchKindValues" MethodName="GetValues" ObjectType="{x:Type sys:Enum}">
             <ObjectDataProvider.MethodParameters>
@@ -62,7 +63,20 @@
                     </StackPanel>
 
                     <GroupBox Grid.Row="1" Header="History">
-                        <ListBox ItemsSource="{Binding StatusLog}" FontFamily="Consolas" FontSize="12"/>
+                        <!-- Wrap long entries instead of letting them run off the right edge. -->
+                        <ListBox ItemsSource="{Binding StatusLog}" FontFamily="Consolas" FontSize="12"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" TextWrapping="Wrap"/>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
                     </GroupBox>
                 </Grid>
             </TabItem>
@@ -86,11 +100,11 @@
 
                         <DataGrid ItemsSource="{Binding Mappings}" AutoGenerateColumns="False" CanUserAddRows="False" RowHeight="32">
                             <DataGrid.Columns>
-                                <DataGridComboBoxColumn Header="Type" SelectedItemBinding="{Binding Kind}" ItemsSource="{Binding Source={StaticResource MatchKindValues}}" Width="90"/>
-                                <DataGridTextColumn Header="Car (CarPath) / Class" Binding="{Binding Key}" Width="180"/>
-                                <DataGridTextColumn Header="Name (display)" Binding="{Binding DisplayName}" Width="190"/>
-                                <DataGridTextColumn Header="Track (if car+track)" Binding="{Binding TrackDisplayName}" Width="150" IsReadOnly="True"/>
-                                <DataGridTemplateColumn Header="Pit House preset" Width="220">
+                                <DataGridComboBoxColumn Header="Type" SelectedItemBinding="{Binding Kind}" ItemsSource="{Binding Source={StaticResource MatchKindValues}}" Width="100"/>
+                                <DataGridTextColumn Header="Car (CarPath) / Class" Binding="{Binding Key}" Width="*" MinWidth="140"/>
+                                <DataGridTextColumn Header="Name (display)" Binding="{Binding DisplayName}" Width="*" MinWidth="140"/>
+                                <DataGridTextColumn Header="Track (if car+track)" Binding="{Binding TrackDisplayName}" Width="*" MinWidth="120" IsReadOnly="True"/>
+                                <DataGridTemplateColumn Header="Pit House preset" Width="240">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <StackPanel Orientation="Horizontal">
@@ -102,7 +116,7 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridCheckBoxColumn Header="Active" Binding="{Binding Enabled}" Width="50"/>
+                                <DataGridCheckBoxColumn Header="Active" Binding="{Binding Enabled}" Width="60"/>
                                 <DataGridTemplateColumn Header="" Width="90">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
@@ -121,11 +135,11 @@
 
                     <DataGrid Grid.Row="2" ItemsSource="{Binding DiscoveredCars}" AutoGenerateColumns="False" CanUserAddRows="False" RowHeight="32">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Car" Binding="{Binding CarScreenName}" Width="200" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Class" Binding="{Binding CarClassShortName}" Width="100" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Track" Binding="{Binding TrackDisplayName}" Width="150" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Last seen" Binding="{Binding LastSeenUtc}" Width="150" IsReadOnly="True"/>
-                            <DataGridTemplateColumn Header="" Width="280">
+                            <DataGridTextColumn Header="Car" Binding="{Binding CarScreenName}" Width="*" MinWidth="160" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Class" Binding="{Binding CarClassShortName}" Width="80" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Track" Binding="{Binding TrackDisplayName}" Width="*" MinWidth="140" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Last seen" Binding="{Binding LastSeenUtc, Converter={StaticResource UtcToLocal}}" Width="130" IsReadOnly="True"/>
+                            <DataGridTemplateColumn Header="" Width="290">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel Orientation="Horizontal">

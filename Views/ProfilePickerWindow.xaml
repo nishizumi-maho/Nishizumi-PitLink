@@ -16,7 +16,26 @@
         <TextBox Grid.Row="1" x:Name="SearchBox" Margin="0,0,0,6" TextChanged="SearchBox_TextChanged"
                  ToolTip="Search by name or wheelbase..."/>
 
-        <ListBox Grid.Row="2" x:Name="PresetList" DisplayMemberPath="Name"/>
+        <ListBox Grid.Row="2" x:Name="PresetList" MouseDoubleClick="PresetList_MouseDoubleClick">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Grid Margin="0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Grid.Column="1" Text="{Binding Detail}" Foreground="Gray" FontSize="11"
+                                   VerticalAlignment="Center" Margin="12,0,0,0"/>
+                    </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                </Style>
+            </ListBox.ItemContainerStyle>
+        </ListBox>
 
         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
             <Button Content="Cancel" Width="90" Margin="0,0,8,0" Click="Cancel_Click"/>

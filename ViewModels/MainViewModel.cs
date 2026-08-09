@@ -13,11 +13,15 @@ public record ProfilePickResult(string PitHousePresetPath, string DisplayName);
 
 public class MainViewModel : ObservableObject, IDisposable
 {
+    /// <summary>How long to keep waiting for Pit House before giving up on a pending preset (30 x 2s = 1 min).</summary>
+    private const int PitHouseRetryAttempts = 30;
+    private static readonly TimeSpan PitHouseRetryDelay = TimeSpan.FromSeconds(2);
+
     private readonly ProfileStore _store;
     private readonly MozaSdkService _moza;
     private readonly IRacingCarWatcher _iracing;
 
-    public Array MatchKinds => Enum.GetValues(typeof(MatchKind));
+    private CancellationTokenSource? _pitHouseRetryCts;
 
     public ObservableCollection<CarMapping> Mappings { get; } = new();
     public ObservableCollection<DiscoveredCar> DiscoveredCars { get; } = new();
@@ -45,7 +49,8 @@ public class MainViewModel : ObservableObject, IDisposable
         {
             if (SetField(ref _startWithWindows, value))
             {
-                AutoStartService.SetEnabled(value);
+                try { AutoStartService.SetEnabled(value); }
+                catch (Exception ex) { Log($"Could not change the Windows start-up setting: {ex.Message}"); }
                 Persist();
             }
         }
@@ -127,7 +132,9 @@ public class MainViewModel : ObservableObject, IDisposable
         foreach (var m in state.Mappings) Mappings.Add(m);
         foreach (var d in state.DiscoveredCars) DiscoveredCars.Add(d);
         _globalEnabled = state.GlobalEnabled;
-        _startWithWindows = state.StartWithWindows;
+        // The registry is the source of truth here, not our own state file - the entry can be removed
+        // outside the app (or fail to write), and the checkbox should reflect what Windows will do.
+        _startWithWindows = AutoStartService.IsEnabled();
         _perTrackProfilesEnabled = state.PerTrackProfilesEnabled;
 
         AddMappingCommand = new RelayCommand(AddMapping);
@@ -184,8 +191,17 @@ public class MainViewModel : ObservableObject, IDisposable
     private static void RunOnUi(Action action)
     {
         var dispatcher = System.Windows.Application.Current?.Dispatcher;
-        if (dispatcher is null || dispatcher.CheckAccess()) action();
-        else dispatcher.Invoke(action);
+        if (dispatcher is null || dispatcher.CheckAccess())
+        {
+            action();
+            return;
+        }
+
+        // Post instead of blocking: these callbacks arrive on the iRacing poll thread, and a blocking
+        // Invoke would deadlock against Stop() waiting on that same thread while shutting down.
+        if (dispatcher.HasShutdownStarted || dispatcher.HasShutdownFinished) return;
+        try { dispatcher.BeginInvoke(action); }
+        catch (InvalidOperationException) { /* dispatcher shut down between the check and the post */ }
     }
 
     private void OnCarChanged(CarInfo? info)
@@ -233,19 +249,23 @@ public class MainViewModel : ObservableObject, IDisposable
                 existing.LastSeenUtc = DateTime.UtcNow;
                 existing.TrackKey = info.TrackKey;
                 existing.TrackDisplayName = info.TrackDisplayName;
+                Persist();
             }
         }
 
         ApplyForCar(info, forceLog: false);
     }
 
-    private void ApplyForCar(CarInfo? info, bool forceLog)
+    private void ApplyForCar(CarInfo? info, bool forceLog, bool allowRetry = true)
     {
         if (info is null)
         {
             if (forceLog) Log("No car currently selected.");
             return;
         }
+
+        // A fresh apply supersedes any retry still waiting on Pit House for an earlier car.
+        if (allowRetry) CancelPendingRetry();
 
         if (!GlobalEnabled)
         {
@@ -258,7 +278,8 @@ public class MainViewModel : ObservableObject, IDisposable
         if (PerTrackProfilesEnabled && !string.IsNullOrEmpty(info.TrackKey))
             mapping = Mappings.FirstOrDefault(m => m.Enabled && m.Kind == MatchKind.CarAndTrack && m.Key == info.CarPath && m.TrackKey == info.TrackKey);
         mapping ??= Mappings.FirstOrDefault(m => m.Enabled && m.Kind == MatchKind.Car && m.Key == info.CarPath);
-        mapping ??= Mappings.FirstOrDefault(m => m.Enabled && m.Kind == MatchKind.CarClass && m.Key == info.CarClassShortName);
+        if (!string.IsNullOrEmpty(info.CarClassShortName))
+            mapping ??= Mappings.FirstOrDefault(m => m.Enabled && m.Kind == MatchKind.CarClass && m.Key == info.CarClassShortName);
 
         if (mapping is null || !mapping.HasTarget)
         {
@@ -288,6 +309,26 @@ public class MainViewModel : ObservableObject, IDisposable
             return;
         }
 
+        // Pit House owns the wheelbase binding, so pushing while it's still starting up would only
+        // half-apply the preset and then be forgotten. Check first and wait for it instead.
+        var probe = _moza.Probe();
+        if (probe != ERRORCODE.NORMAL)
+        {
+            if (allowRetry)
+            {
+                CurrentProfileDisplay = $"{targetName} (waiting for Pit House)";
+                Log($"{DescribeProbe(probe)} — will apply \"{targetName}\" as soon as it's ready.");
+                StartWaitingForPitHouse(info);
+            }
+            else
+            {
+                CurrentProfileDisplay = "(Pit House not ready)";
+                Log($"Gave up waiting for Pit House — \"{targetName}\" was not applied. Use \"Reapply preset for current car\" once it's up.");
+            }
+            RefreshWheelbaseStatus();
+            return;
+        }
+
         var outcome = _moza.Apply(motor);
         if (outcome.Success)
         {
@@ -302,6 +343,59 @@ public class MainViewModel : ObservableObject, IDisposable
 
         RefreshWheelbaseStatus();
     }
+
+    private void CancelPendingRetry()
+    {
+        _pitHouseRetryCts?.Cancel();
+        _pitHouseRetryCts?.Dispose();
+        _pitHouseRetryCts = null;
+    }
+
+    /// <summary>
+    /// Polls until Pit House is ready, then applies the preset for <paramref name="info"/> once.
+    /// Covers the common cases of launching at Windows sign-in before Pit House is up, or switching
+    /// the wheel on after iRacing is already running.
+    /// </summary>
+    private void StartWaitingForPitHouse(CarInfo info)
+    {
+        var cts = new CancellationTokenSource();
+        _pitHouseRetryCts = cts;
+        _ = WaitForPitHouseAsync(info, cts.Token);
+    }
+
+    private async Task WaitForPitHouseAsync(CarInfo info, CancellationToken token)
+    {
+        for (var attempt = 0; attempt < PitHouseRetryAttempts; attempt++)
+        {
+            try { await Task.Delay(PitHouseRetryDelay, token); }
+            catch (TaskCanceledException) { return; }
+
+            if (token.IsCancellationRequested) return;
+            if (_moza.Probe() != ERRORCODE.NORMAL) continue;
+
+            RunOnUi(() =>
+            {
+                // The car may have changed while we were waiting - only apply if it's still current.
+                if (!token.IsCancellationRequested && ReferenceEquals(_currentCar, info))
+                    ApplyForCar(info, forceLog: false, allowRetry: false);
+            });
+            return;
+        }
+
+        RunOnUi(() =>
+        {
+            if (!token.IsCancellationRequested && ReferenceEquals(_currentCar, info))
+                ApplyForCar(info, forceLog: false, allowRetry: false);
+        });
+    }
+
+    private static string DescribeProbe(ERRORCODE err) => err switch
+    {
+        ERRORCODE.PITHOUSENOTREADY => "MOZA Pit House isn't ready yet",
+        ERRORCODE.NODEVICES => "No MOZA wheelbase detected yet",
+        ERRORCODE.NOINSTALLSDK => "The MOZA SDK isn't initialized",
+        _ => $"The wheelbase isn't available ({err})",
+    };
 
     /// <summary>
     /// Right after installMozaSDK() the wheelbase binding (device discovery through Pit House) can
@@ -363,15 +457,11 @@ public class MainViewModel : ObservableObject, IDisposable
         mapping.PitHousePresetPath = result.PitHousePresetPath;
         mapping.TargetDisplayName = $"Preset: {result.DisplayName}";
 
-        RefreshMappingsView();
         Persist();
 
         // The mapping the player is currently in might just have gained a target - re-apply immediately.
         if (_currentCar is not null) ApplyForCar(_currentCar, forceLog: false);
     }
-
-    private void RefreshMappingsView()
-        => System.Windows.Data.CollectionViewSource.GetDefaultView(Mappings)?.Refresh();
 
     private void AssignDiscoveredCar(DiscoveredCar discovered)
         => AssignMapping(MatchKind.Car, discovered.CarPath, discovered.CarScreenName, string.Empty, string.Empty, discovered);
@@ -446,11 +536,14 @@ public class MainViewModel : ObservableObject, IDisposable
             Mappings = Mappings.ToList(),
             DiscoveredCars = DiscoveredCars.ToList(),
         };
-        _store.Save(state);
+
+        var error = _store.Save(state);
+        if (error is not null) Log($"Could not save settings: {error}");
     }
 
     public void Dispose()
     {
+        CancelPendingRetry();
         Persist();
         _iracing.Dispose();
         _moza.Dispose();

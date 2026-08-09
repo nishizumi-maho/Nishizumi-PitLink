@@ -5,7 +5,22 @@ using NishizumiPitLink.Models;
 
 namespace NishizumiPitLink.Services;
 
-public record PitHousePresetSummary(string FilePath, string Id, string Name, string Devices);
+public record PitHousePresetSummary(string FilePath, string Id, string Name, string Devices)
+{
+    /// <summary>
+    /// Wheelbase plus a short id fragment. Pit House happily saves several presets under the same
+    /// name, so the name alone can't identify one - and picking a preset saved for a different
+    /// wheelbase would push the wrong torque range at the wheel.
+    /// </summary>
+    public string Detail
+    {
+        get
+        {
+            var shortId = Id.Length >= 8 ? Id[..8] : Id;
+            return string.IsNullOrEmpty(Devices) ? shortId : $"{Devices} · {shortId}";
+        }
+    }
+}
 
 /// <summary>
 /// Reads MOZA Pit House's own Motor presets (.mzpreset files, which are zip archives containing

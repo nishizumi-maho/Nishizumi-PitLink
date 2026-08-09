@@ -29,6 +29,11 @@ public partial class ProfilePickerWindow : Window
                 p.Devices.Contains(term, StringComparison.CurrentCultureIgnoreCase)).ToList();
     }
 
+    private void PresetList_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (PresetList.SelectedItem is PitHousePresetSummary) Use_Click(sender, e);
+    }
+
     private void Use_Click(object sender, RoutedEventArgs e)
     {
         if (PresetList.SelectedItem is PitHousePresetSummary preset)

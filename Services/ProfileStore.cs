@@ -42,12 +42,23 @@ public class ProfileStore
         }
     }
 
-    public void Save(AppState state)
+    /// <summary>Writes the state file. Returns null on success, or a message describing why it failed.</summary>
+    public string? Save(AppState state)
     {
-        var json = JsonSerializer.Serialize(state, JsonOptions);
-        var tmpPath = _filePath + ".tmp";
-        File.WriteAllText(tmpPath, json);
-        File.Copy(tmpPath, _filePath, overwrite: true);
-        File.Delete(tmpPath);
+        try
+        {
+            var json = JsonSerializer.Serialize(state, JsonOptions);
+            var tmpPath = _filePath + ".tmp";
+            File.WriteAllText(tmpPath, json);
+            // Move is atomic on the same volume, so an interrupted save can't leave a half-written
+            // state.json behind the way an overwriting copy can.
+            File.Move(tmpPath, _filePath, overwrite: true);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            // Saving settings must never take the app down - it's called from ordinary UI actions.
+            return ex.Message;
+        }
     }
 }

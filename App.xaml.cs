@@ -1,3 +1,5 @@
+using System.IO;
+using System.Threading;
 using System.Windows;
 using NishizumiPitLink.ViewModels;
 using Forms = System.Windows.Forms;
@@ -7,22 +9,35 @@ namespace NishizumiPitLink;
 
 public partial class App : System.Windows.Application
 {
+    private const string SingleInstanceMutexName = @"Local\NishizumiPitLink.SingleInstance";
+
     private Forms.NotifyIcon? _trayIcon;
     private MainViewModel? _viewModel;
     private Views.MainWindow? _mainWindow;
+    private Mutex? _singleInstanceMutex;
     private bool _isExiting;
 
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
-        DispatcherUnhandledException += (_, args) =>
+        // Two copies would fight over the wheelbase and stack up tray icons - easy to hit when the
+        // app is set to start with Windows and then also launched by hand.
+        _singleInstanceMutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var isOnlyInstance);
+        if (!isOnlyInstance)
         {
             System.Windows.MessageBox.Show(
-                $"An unexpected error occurred:\n\n{args.Exception}",
-                "Nishizumi PitLink — error",
-                MessageBoxButton.OK, MessageBoxImage.Error);
+                "Nishizumi PitLink is already running — look for it in the system tray, next to the clock.",
+                "Nishizumi PitLink",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            Shutdown();
+            return;
+        }
+
+        DispatcherUnhandledException += (_, args) =>
+        {
             args.Handled = true;
+            ReportUnhandledException(args.Exception);
         };
 
         _viewModel = new MainViewModel();
@@ -69,6 +84,32 @@ public partial class App : System.Windows.Application
         _trayIcon.DoubleClick += (_, _) => ShowMainWindow();
     }
 
+    /// <summary>
+    /// Shows something a human can act on and puts the full stack trace in a log file, rather than
+    /// filling a message box with an unreadable wall of frames.
+    /// </summary>
+    private static void ReportUnhandledException(Exception ex)
+    {
+        string? logPath = null;
+        try
+        {
+            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "NishizumiPitLink");
+            Directory.CreateDirectory(dir);
+            logPath = Path.Combine(dir, "error.log");
+            File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {ex}{Environment.NewLine}{Environment.NewLine}");
+        }
+        catch
+        {
+            logPath = null; // logging is best effort - never let it mask the original error
+        }
+
+        var details = logPath is null ? string.Empty : $"\n\nFull details were saved to:\n{logPath}";
+        System.Windows.MessageBox.Show(
+            $"{ex.Message}{details}\n\nThe app is still running.",
+            "Nishizumi PitLink — error",
+            MessageBoxButton.OK, MessageBoxImage.Error);
+    }
+
     private static Drawing.Icon LoadAppIcon()
     {
         var exePath = Environment.ProcessPath ?? System.Reflection.Assembly.GetExecutingAssembly().Location;
@@ -89,6 +130,14 @@ public partial class App : System.Windows.Application
         _trayIcon?.Dispose();
         _viewModel?.Dispose();
         _mainWindow?.Close();
+
+        if (_singleInstanceMutex is not null)
+        {
+            try { _singleInstanceMutex.ReleaseMutex(); } catch { /* not held - nothing to release */ }
+            _singleInstanceMutex.Dispose();
+            _singleInstanceMutex = null;
+        }
+
         Shutdown();
     }
 }

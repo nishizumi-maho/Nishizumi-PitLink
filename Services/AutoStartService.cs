@@ -11,8 +11,16 @@ public static class AutoStartService
 
     public static bool IsEnabled()
     {
-        using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: false);
-        return key?.GetValue(ValueName) is not null;
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: false);
+            return key?.GetValue(ValueName) is not null;
+        }
+        catch
+        {
+            // Registry policy can block reads; report "off" rather than failing app start-up.
+            return false;
+        }
     }
 
     public static void SetEnabled(bool enabled)
