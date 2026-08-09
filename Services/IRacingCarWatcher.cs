@@ -86,7 +86,7 @@ public class IRacingCarWatcher : IDisposable
         using (var view = mmf.CreateViewAccessor(0, MemoryMapSize, MemoryMappedFileAccess.Read))
         {
             var status = view.ReadInt32(4);
-            if (!SetConnected((status & StatusConnected) != 0))
+            if (SetConnected((status & StatusConnected) != 0))
                 return; // not connected - nothing further to read
 
             var sessionInfoUpdate = view.ReadInt32(12);
