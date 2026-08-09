@@ -173,6 +173,13 @@
 
                     <Button Content="Open Pit House presets folder" Command="{Binding OpenPresetsFolderCommand}" HorizontalAlignment="Left" Margin="0,0,0,14"/>
 
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                        <Button Content="Check for updates" Command="{Binding CheckForUpdatesCommand}" Margin="0,0,10,0"/>
+                        <Button Content="Restart to install update" Command="{Binding RestartToInstallUpdateCommand}"
+                                Visibility="{Binding UpdateReady, Converter={StaticResource BoolToVis}}" Margin="0,0,10,0"/>
+                        <TextBlock Text="{Binding UpdateStatus}" VerticalAlignment="Center" Foreground="Gray"/>
+                    </StackPanel>
+
                     <TextBlock TextWrapping="Wrap" Foreground="Gray" MaxWidth="640" HorizontalAlignment="Left"
                                Text="This app never edits force feedback itself - all FFB tuning happens in MOZA Pit House, as usual. Here you only decide which already-saved Pit House Motor preset should load for which car (or car+track). When iRacing reports a matching car, this app reads that preset fresh from disk and pushes it to the wheelbase through the official MOZA SDK, in parallel with Pit House (which must stay open - it owns the wheelbase connection). Car and track detection reads iRacing's shared-memory telemetry directly. Mappings are saved in %AppData%\NishizumiPitLink\state.json."/>
                 </StackPanel>

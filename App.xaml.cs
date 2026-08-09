@@ -2,6 +2,7 @@ using System.IO;
 using System.Threading;
 using System.Windows;
 using NishizumiPitLink.ViewModels;
+using Velopack;
 using Forms = System.Windows.Forms;
 using Drawing = System.Drawing;
 
@@ -16,6 +17,21 @@ public partial class App : System.Windows.Application
     private Views.MainWindow? _mainWindow;
     private Mutex? _singleInstanceMutex;
     private bool _isExiting;
+
+    /// <summary>
+    /// Custom entry point (see StartupObject in the csproj) so Velopack gets first crack at argv: on
+    /// the install/update/uninstall hooks it invokes the exe with, this handles the hook and exits
+    /// before any UI is touched.
+    /// </summary>
+    [STAThread]
+    public static void Main(string[] args)
+    {
+        VelopackApp.Build().Run();
+
+        var app = new App();
+        app.InitializeComponent();
+        app.Run();
+    }
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -74,6 +90,9 @@ public partial class App : System.Windows.Application
         {
             if (_viewModel is not null) _viewModel.GlobalEnabled = !_viewModel.GlobalEnabled;
         };
+
+        var updateItem = menu.Items.Add("Check for updates");
+        updateItem.Click += (_, _) => _viewModel?.CheckForUpdatesCommand.Execute(null);
 
         menu.Items.Add(new Forms.ToolStripSeparator());
 

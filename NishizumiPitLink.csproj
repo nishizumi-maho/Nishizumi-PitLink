@@ -17,10 +17,23 @@
     <Product>Nishizumi PitLink</Product>
     <Authors>nishizumi-maho</Authors>
     <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
+    <!-- App.xaml is compiled as a Page (below) instead of the default ApplicationDefinition, so WPF
+         doesn't auto-generate a Main() - App.xaml.cs defines one instead, giving Velopack first crack
+         at argv before any UI is touched. -->
+    <StartupObject>NishizumiPitLink.App</StartupObject>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Velopack" Version="1.2.0" />
     <PackageReference Include="YamlDotNet" Version="16.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ApplicationDefinition Remove="App.xaml" />
+    <Page Include="App.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
   </ItemGroup>
 
   <ItemGroup>

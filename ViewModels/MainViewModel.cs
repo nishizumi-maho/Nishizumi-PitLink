@@ -20,6 +20,7 @@ public class MainViewModel : ObservableObject, IDisposable
     private readonly ProfileStore _store;
     private readonly MozaSdkService _moza;
     private readonly IRacingCarWatcher _iracing;
+    private readonly UpdateService _updates = new();
 
     private CancellationTokenSource? _pitHouseRetryCts;
 
@@ -106,6 +107,26 @@ public class MainViewModel : ObservableObject, IDisposable
         private set => SetField(ref _wheelbaseStatus, value);
     }
 
+    private string _updateStatus = "";
+    public string UpdateStatus
+    {
+        get => _updateStatus;
+        private set => SetField(ref _updateStatus, value);
+    }
+
+    private bool _updateReady;
+    public bool UpdateReady
+    {
+        get => _updateReady;
+        private set
+        {
+            if (SetField(ref _updateReady, value)) RestartToInstallUpdateCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    public RelayCommand CheckForUpdatesCommand { get; }
+    public RelayCommand RestartToInstallUpdateCommand { get; }
+
     public RelayCommand AddMappingCommand { get; }
     public RelayCommand DeleteMappingCommand { get; }
     public RelayCommand ChooseMappingTargetCommand { get; }
@@ -146,6 +167,8 @@ public class MainViewModel : ObservableObject, IDisposable
         MapCurrentCarForTrackCommand = new RelayCommand(MapCurrentCarForTrack, () => PerTrackProfilesEnabled && _currentCar is not null);
         ForceReapplyCommand = new RelayCommand(() => ApplyForCar(_currentCar, forceLog: true));
         RefreshWheelbaseStatusCommand = new RelayCommand(RefreshWheelbaseStatus);
+        CheckForUpdatesCommand = new RelayCommand(() => _ = CheckForUpdatesAsync());
+        RestartToInstallUpdateCommand = new RelayCommand(() => _updates.ApplyAndRestart(), () => UpdateReady);
         OpenPresetsFolderCommand = new RelayCommand(() =>
         {
             Directory_CreateIfMissing(PitHousePresetImporter.DefaultPresetsFolder);
@@ -181,6 +204,26 @@ public class MainViewModel : ObservableObject, IDisposable
         _iracing.Start();
 
         Log("Ready. Waiting for iRacing...");
+
+        _ = CheckForUpdatesSoonAsync();
+    }
+
+    /// <summary>Waits a bit past startup so a slow update check never delays the tray icon or first car apply.</summary>
+    private async Task CheckForUpdatesSoonAsync()
+    {
+        await Task.Delay(TimeSpan.FromSeconds(10));
+        await CheckForUpdatesAsync();
+    }
+
+    private async Task CheckForUpdatesAsync()
+    {
+        var result = await _updates.CheckAndDownloadAsync();
+        RunOnUi(() =>
+        {
+            UpdateStatus = result;
+            UpdateReady = _updates.UpdateReady;
+            if (UpdateReady) Log(result);
+        });
     }
 
     private static void Directory_CreateIfMissing(string path)

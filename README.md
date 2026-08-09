@@ -81,6 +81,32 @@ dotnet build
 
 or open `NishizumiPitLink.csproj` in Visual Studio / Rider.
 
+## Releasing (installer + auto-update)
+
+Releases are packaged with [Velopack](https://velopack.io) into a Windows installer
+(`NishizumiPitLink-win-Setup.exe`). The app checks GitHub Releases for a newer version shortly
+after every launch (and via "Check for updates" in Settings or the tray menu), downloads it in the
+background, and installs it on restart — no manual download needed for anyone who used the
+installer.
+
+```
+dotnet tool install -g vpk        # once
+dotnet publish -c Release -r win-x64 --self-contained false -o publish
+vpk pack --packId NishizumiPitLink --packVersion <X.Y.Z> --packDir publish ^
+  --mainExe NishizumiPitLink.exe --packAuthors nishizumi-maho --packTitle "Nishizumi PitLink" ^
+  --icon Assets\icon.ico --framework net8.0-x64-desktop -o Releases
+```
+
+This produces, in `Releases/`:
+
+- `NishizumiPitLink-win-Setup.exe` — the installer (this is the asset most people should download).
+- `NishizumiPitLink-<version>-full.nupkg`, `releases.win.json`, `RELEASES` — the update feed; these
+  must be uploaded to the GitHub release too, or installed copies won't find the update.
+
+Upload every file in `Releases/` to the matching GitHub release (`vpk upload github` can do this
+for you, given a `--repoUrl` and a token with `contents: write`). Each release's version must be
+higher than the last for the update feed to pick it up.
+
 ## Using the app
 
 1. Open MOZA Pit House and tune/save your Motor presets there as usual.
