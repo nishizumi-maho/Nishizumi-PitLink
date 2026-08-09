@@ -45,7 +45,7 @@ public partial class App : System.Windows.Application
     {
         _trayIcon = new Forms.NotifyIcon
         {
-            Icon = Drawing.SystemIcons.Application,
+            Icon = LoadAppIcon(),
             Visible = true,
             Text = "Nishizumi PitLink",
         };
@@ -67,6 +67,12 @@ public partial class App : System.Windows.Application
 
         _trayIcon.ContextMenuStrip = menu;
         _trayIcon.DoubleClick += (_, _) => ShowMainWindow();
+    }
+
+    private static Drawing.Icon LoadAppIcon()
+    {
+        var exePath = Environment.ProcessPath ?? System.Reflection.Assembly.GetExecutingAssembly().Location;
+        return Drawing.Icon.ExtractAssociatedIcon(exePath) ?? Drawing.SystemIcons.Application;
     }
 
     private void ShowMainWindow()

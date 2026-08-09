@@ -16,10 +16,15 @@
     <Version>1.0.0</Version>
     <Product>Nishizumi PitLink</Product>
     <Authors>nishizumi-maho</Authors>
+    <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="YamlDotNet" Version="16.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\icon.ico" />
   </ItemGroup>
 
   <ItemGroup>

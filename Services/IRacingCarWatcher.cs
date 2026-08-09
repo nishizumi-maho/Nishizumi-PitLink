@@ -61,7 +61,7 @@ public class IRacingCarWatcher : IDisposable
             }
             catch (Exception ex)
             {
-                SdkException?.Invoke(ex);
+                RaiseSdkException(ex);
             }
 
             try { await Task.Delay(PollInterval, token); }
@@ -162,9 +162,21 @@ public class IRacingCarWatcher : IDisposable
         }
         catch (Exception ex)
         {
-            SdkException?.Invoke(ex);
+            RaiseSdkException(ex);
             return false;
         }
+    }
+
+    /// <summary>
+    /// Raising SdkException is itself done from inside a catch block, so a subscriber that throws
+    /// (e.g. a UI handler failing mid-dispatch) must never be allowed to escape here - otherwise the
+    /// exception propagates out of the fire-and-forget poll Task, faults it silently, and permanently
+    /// kills polling since nothing observes that Task's exception outside of an explicit Stop().
+    /// </summary>
+    private void RaiseSdkException(Exception ex)
+    {
+        try { SdkException?.Invoke(ex); }
+        catch { /* never let a subscriber's failure kill the poll loop */ }
     }
 
     /// <summary>

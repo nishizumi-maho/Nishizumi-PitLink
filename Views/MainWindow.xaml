@@ -6,6 +6,7 @@
         xmlns:models="clr-namespace:NishizumiPitLink.Models"
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         Title="Nishizumi PitLink — iRacing car → MOZA Pit House preset switcher"
+        Icon="/Assets/icon.ico"
         Height="720" Width="1040" MinHeight="560" MinWidth="900"
         WindowStartupLocation="CenterScreen">
 
